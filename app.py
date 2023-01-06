@@ -1,10 +1,14 @@
 import flask
+import flask_httpauth
 import json
 import multidict
 import requests
+import werkzeug.security
 
 
 app = flask.Flask(__name__)
+auth = flask_httpauth.HTTPBasicAuth()
+
 with open("properties.json", "r") as f:
     app.tera_configs = json.load(f)
 
@@ -21,6 +25,14 @@ def dnsimple_get_id():
 
 
 app.tera_configs['dnsimple_id'] = dnsimple_get_id()
+
+
+# auth stuff - https://flask-httpauth.readthedocs.io/en/latest/
+@auth.verify_password
+def verify_password(username, password):
+    if username in app.tera_configs['usermap']:
+        if werkzeug.security.check_password_hash(app.tera_configs['usermap'][username], password):
+            return username
 
 
 def dnsimple_api_uri(path):
@@ -88,11 +100,24 @@ def dnsimple_post_machine(location, machine_name, ip):
     resp.raise_for_status()
 
 
-def dnsimple_delete_machine(location, machine_name):
+def dnsimple_delete_machine(location, machine_name, prefixes=False):
     records = dnsimple_get_records()
     name_prefix = pair_to_name_prefix(location, machine_name)
     domain = app.tera_configs['zone_root']
-    found = False
+    if prefixes:
+        app.logger.info(f"Deleting all records under {name_prefix}.{domain}")
+        for name in records.keys():
+            if name.endswith(name_prefix):
+                recordset = records.getall(name)
+                for record in recordset:
+                    if record['type'] != 'A':
+                        continue
+                    app.logger.info(f"Deleting record {record['name']} for ip {record['content']} (id={record['id']})")
+                    resp = app.dnssession.delete(dnsimple_api_uri(f"zones/{app.tera_configs['zone_root']}/records/{record['id']}"))
+                    resp.raise_for_status()
+        return
+
+    # not deleting all prefixes, only perfect matches
     if name_prefix not in records:
         # nothing to delete
         return
@@ -103,21 +128,16 @@ def dnsimple_delete_machine(location, machine_name):
         app.logger.info(f"Deleting record {name_prefix}.{domain} for ip {record['content']} (id={record['id']})")
         resp = app.dnssession.delete(dnsimple_api_uri(f"zones/{app.tera_configs['zone_root']}/records/{record['id']}"))
         resp.raise_for_status()
-        found = True
-
-    if found:
-        # found or updated at least one entry
-        return
-
-    # no records found, def. have to create
-    app.logger.info(f"Creating new record {name_prefix}.{domain} for ip {ip}")
-    new_record = {"name": name_prefix, "type": "A", "content": ip, "ttl": 60, "priority": 15}
-    resp = app.dnssession.post(dnsimple_api_uri(f"zones/{app.tera_configs['zone_root']}/records"), params=new_record)
-    resp.raise_for_status()
 
 def extract_mappings(fields):
-    import pprint
-    app.logger.info(pprint.pformat(fields))
+    mappings = dict()
+    for key in sorted(fields.keys()):
+        if key.startswith('name'):
+            num = int(key.split('name')[1])
+            val = fields[f"ip{num}"]
+            mappings[f"ip{num}"] = val
+            mappings[fields[f"name{num}"]] = val
+    return mappings
 
 
 @app.route('/')
@@ -126,16 +146,27 @@ def index():
 
 
 @app.route('/api/v1/autoregister/<location>/<machine_name>', methods=('GET', 'POST'))
+@auth.login_required
 def autoregister(location, machine_name):
+    mappings = dict()
+    statuses = []
     if flask.request.method == 'POST':
-        import pprint
-        app.logger.info(f"Req values: {pprint.pformat(flask.request.values)}")
-    dnsimple_post_machine(location, machine_name, flask.request.remote_addr)
-    return f"Registered machine '{machine_name}' at location '{location}' with public ip '{flask.request.remote_addr}'"
+        mappings = extract_mappings(flask.request.values)
+
+    if 'public' not in mappings:
+        mappings['public'] = flask.request.remote_addr
+
+    for i in mappings:
+        statuses.append(f"Registered machine '{i}.{machine_name}' at location '{location}' with ip '{mappings[i]}'")
+        dnsimple_post_machine(location, f"{i}.{machine_name}", mappings[i])
+    statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['public']}'")
+    dnsimple_post_machine(location, machine_name, mappings['public'])
+    return "\n".join(statuses)
 
 @app.route('/api/v1/delete/<location>/<machine_name>', methods=('GET', 'POST'))
+@auth.login_required
 def delete(location, machine_name):
-    dnsimple_delete_machine(location, machine_name)
+    dnsimple_delete_machine(location, machine_name, prefixes=True)
     return f"Deleted machine '{machine_name}' at location '{location}' with public ip '{flask.request.remote_addr}'"
 
 

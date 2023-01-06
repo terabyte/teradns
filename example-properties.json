@@ -2,6 +2,6 @@
     "dnsimple_oauth_token":"xxx",
     "zone_root":"example.com",
     "dns_prefix":"dyn",
-    "shared_secret":"xxx"
+    "usermap":{"user1":"pbkdf2:sha256:260000$J9rrEwtsGsnwoSAc$e2c06f6f84133b95c340a9423e95599905fea3d3e3d1c909b4f0ae4f24bfc763"}
 }
 
