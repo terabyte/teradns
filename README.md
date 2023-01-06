@@ -101,7 +101,6 @@ If you do not specify a `public` named interface, the remote_addr as seen by the
 
 Nice to have features:
 
-* smart client
 * IPv6 support
 * better caching/efficiency
 * support emtpy dns prefix
