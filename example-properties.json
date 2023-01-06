@@ -1,6 +1,7 @@
 {
     "dnsimple_oauth_token":"xxx",
     "zone_root":"example.com",
-    "dns_prefix":"dyn"
+    "dns_prefix":"dyn",
+    "shared_secret":"xxx"
 }
 
