@@ -97,6 +97,22 @@ workdesktop.home.dyn.example.com 1.2.3.4
 ```
 If you do not specify a `public` named interface, the remote_addr as seen by the service will be used (for both `public` and the top-level entry for that machine).
 
+# smart client
+
+You can also run the smart client:
+```
+$ virtualenv .ve
+$ source .ve/bin/activate
+$ pip install -r requirements.txt
+$ bin/teradyndns-client.py --service http://dyn.example.com --user user1 --password password --location home --machine laptop
+Response: Registered machine 'ip1.laptop' at location 'home' with ip '192.168.1.196'
+Registered machine 'wlp0s20f3.laptop' at location 'home' with ip '192.168.1.196'
+Registered machine 'ip2.laptop' at location 'home' with ip '192.168.1.204'
+Registered machine 'eno1.laptop' at location 'home' with ip '192.168.1.204'
+Registered machine 'public.laptop' at location 'home' with ip '1.2.3.4'
+Registered machine 'laptop' at location 'home' with ip '1.2.3.4'
+```
+
 # TODO
 
 Nice to have features:
