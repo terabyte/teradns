@@ -7,6 +7,8 @@ import werkzeug.security
 
 
 app = flask.Flask(__name__)
+
+
 auth = flask_httpauth.HTTPBasicAuth()
 
 with open("properties.json", "r") as f:
@@ -129,6 +131,7 @@ def dnsimple_delete_machine(location, machine_name, prefixes=False):
         resp = app.dnssession.delete(dnsimple_api_uri(f"zones/{app.tera_configs['zone_root']}/records/{record['id']}"))
         resp.raise_for_status()
 
+
 def extract_mappings(fields):
     mappings = dict()
     for key in sorted(fields.keys()):
@@ -154,14 +157,32 @@ def autoregister(location, machine_name):
         mappings = extract_mappings(flask.request.values)
 
     if 'public' not in mappings:
-        mappings['public'] = flask.request.remote_addr
+        # I tried to fix using a more standard way, but I couldn't make it
+        # work. Not worth the effort, we don't trust this IP or anything it is
+        # only for convenience, if a client spoofs it I don't really care.
+        #
+        # https://stackoverflow.com/a/12771438
+        # https://esd.io/blog/flask-apps-heroku-real-ip-spoofing.html
+        # https://werkzeug.palletsprojects.com/en/1.0.x/middleware/proxy_fix/
+        if flask.request.headers.getlist("X-Forwarded-For"):
+            mappings['public'] = flask.request.headers.getlist("X-Forwarded-For")[0]
+        elif flask.request.remote_addr:
+            mappings['public'] = flask.request.remote_addr
+        else:
+            statuses.append("Warning: could not determine public IP, skipping.")
 
     for i in mappings:
         statuses.append(f"Registered machine '{i}.{machine_name}' at location '{location}' with ip '{mappings[i]}'")
         dnsimple_post_machine(location, f"{i}.{machine_name}", mappings[i])
-    statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['public']}'")
-    dnsimple_post_machine(location, machine_name, mappings['public'])
+    if 'public' in mappings:
+        statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['public']}'")
+        dnsimple_post_machine(location, machine_name, mappings['public'])
+    else:
+        key = sorted(mappings.keys())[0]
+        statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['key']}' (from {key} iface)")
+
     return "\n".join(statuses)
+
 
 @app.route('/api/v1/delete/<location>/<machine_name>', methods=('GET', 'POST'))
 @auth.login_required
