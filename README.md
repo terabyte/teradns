@@ -117,6 +117,7 @@ Registered machine 'laptop' at location 'home' with ip '1.2.3.4'
 
 Nice to have features:
 
+* Remove stale IPs when updating a machine
 * IPv6 support
 * better caching/efficiency
 * support emtpy dns prefix
