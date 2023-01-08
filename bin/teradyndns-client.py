@@ -18,10 +18,14 @@ parser.add_argument('--password', help='password for authenticating to TeraDynDN
 parser.add_argument('--location', help='location of this machine', default='home')
 parser.add_argument('--machine', help='name of this machine', default=socket.gethostname())
 parser.add_argument('--operation', help='operation to perform (autoregister, delete)', default='autoregister')
+parser.add_argument('--default', help='default iface to use (will use public ip if not given)', default='public')
 args = parser.parse_args()
 
 params = dict()
 count = 0
+
+if args.default:
+    params['default'] = args.default
 
 for iface in netifaces.interfaces():
     if iface == 'lo' or iface.startswith('vbox') or iface.startswith('docker') or iface.startswith('gpd') or iface.startswith('tun'):

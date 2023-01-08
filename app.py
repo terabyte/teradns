@@ -156,7 +156,11 @@ def autoregister(location, machine_name):
     if flask.request.method == 'POST':
         mappings = extract_mappings(flask.request.values)
 
-    if 'public' not in mappings:
+    default = 'public'
+    if 'default' in flask.request.values:
+        default = flask.request.values['default']
+
+    if default not in mappings:
         # I tried to fix using a more standard way, but I couldn't make it
         # work. Not worth the effort, we don't trust this IP or anything it is
         # only for convenience, if a client spoofs it I don't really care.
@@ -165,18 +169,18 @@ def autoregister(location, machine_name):
         # https://esd.io/blog/flask-apps-heroku-real-ip-spoofing.html
         # https://werkzeug.palletsprojects.com/en/1.0.x/middleware/proxy_fix/
         if flask.request.headers.getlist("X-Forwarded-For"):
-            mappings['public'] = flask.request.headers.getlist("X-Forwarded-For")[0]
+            mappings[default] = flask.request.headers.getlist("X-Forwarded-For")[0]
         elif flask.request.remote_addr:
-            mappings['public'] = flask.request.remote_addr
+            mappings[default] = flask.request.remote_addr
         else:
             statuses.append("Warning: could not determine public IP, skipping.")
 
     for i in mappings:
         statuses.append(f"Registered machine '{i}.{machine_name}' at location '{location}' with ip '{mappings[i]}'")
         dnsimple_post_machine(location, f"{i}.{machine_name}", mappings[i])
-    if 'public' in mappings:
-        statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['public']}'")
-        dnsimple_post_machine(location, machine_name, mappings['public'])
+    if default in mappings:
+        statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings[default]}'")
+        dnsimple_post_machine(location, machine_name, mappings[default])
     else:
         key = sorted(mappings.keys())[0]
         statuses.append(f"Registered machine '{machine_name}' at location '{location}' with ip '{mappings['key']}' (from {key} iface)")
