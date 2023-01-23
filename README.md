@@ -1,3 +1,7 @@
+# NOTE
+
+Shortly after writing this, I learned about [tailscale](https://tailscale.com/). With its "magic dns", it solves this problem and many others.  As such, I will probably not be contributing to this project anymore, but it is still a good start and quite usable if you prefer.
+
 # TeraDynDNS
 
 TeraDynDNS is a simple web app which lets machines you manage update their dns
